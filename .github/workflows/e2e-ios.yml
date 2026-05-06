@@ -194,6 +194,9 @@ jobs:
           mkdir -p ios/build/Build/Products/Release-iphonesimulator
           tar -xzf BlueWallet.app.tar.gz -C ios/build/Build/Products/Release-iphonesimulator
 
+      - name: Disable simulator animations
+        run: defaults write com.apple.iphonesimulator SlowMotionAnimation -bool NO
+
       - name: Run detox tests
         timeout-minutes: 360
         run: |
@@ -202,6 +205,7 @@ jobs:
             --record-logs failing \
             --take-screenshots failing \
             --headless \
+            --workers 2 \
             --retries 3 \
             --reuse \
             --artifacts-location ./artifacts
