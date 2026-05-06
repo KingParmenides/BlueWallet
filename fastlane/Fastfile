@@ -622,7 +622,7 @@ platform :ios do
       should_sign = has_signing_creds && has_match_creds && ENV['CATALYST_SKIP_CODESIGNING'] != '1'
       signing_identity = ENV['CATALYST_SIGNING_IDENTITY'] || "Apple Distribution"
 
-      xcargs_str = "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES"
+      xcargs_str = "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CLANG_ENABLE_EXPLICIT_MODULES=NO SWIFT_ENABLE_EXPLICIT_MODULES=NO"
       if should_sign
         UI.message("Setting up Mac Catalyst provisioning profiles via match...")
         team_id = ENV['CATALYST_TEAM_ID']
@@ -1177,10 +1177,11 @@ end
           export_options: export_options_path,
           output_directory: ipa_directory,
           output_name: ipa_name,
+          xcargs: "CLANG_ENABLE_EXPLICIT_MODULES=NO SWIFT_ENABLE_EXPLICIT_MODULES=NO",
           buildlog_path: File.join(project_root, "ios", "build_logs")
           # Removed explicit destination - let Xcode determine the best destination for release builds
         )
-        
+
         UI.success("\033[1;32miOS release build completed successfully!\033[0m")
         
       rescue => build_error
@@ -1221,6 +1222,7 @@ end
             export_options: export_options_path,
             output_directory: ipa_directory,
             output_name: ipa_name,
+            xcargs: "CLANG_ENABLE_EXPLICIT_MODULES=NO SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             buildlog_path: File.join(project_root, "ios", "build_logs")
           )
         else

@@ -27,6 +27,8 @@ jobs:
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       MATCH_READONLY: "true"
+      CCACHE_MAXSIZE: "2G"
+      CCACHE_DIR: /Users/runner/.ccache
 
     steps:
       - name: Checkout Project
@@ -254,11 +256,26 @@ jobs:
             ios/Pods
             ~/Library/Caches/CocoaPods
             ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-ios-release-${{ hashFiles('ios/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-ios-release-ccache-${{ hashFiles('ios/Podfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pods-ios-release-
+            ${{ runner.os }}-pods-ios-release-ccache-
+
+      - name: Install ccache
+        run: brew install ccache
+
+      - name: Cache ccache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: /Users/runner/.ccache
+          key: ${{ runner.os }}-ccache-ios-release-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-ios-release-
 
       - name: Install CocoaPods Dependencies
+        env:
+          RCT_USE_RN_DEP: "1"
+          RCT_USE_PREBUILT_RNCORE: "1"
+          USE_CCACHE: "1"
         run: |
           bundle exec fastlane ios install_pods
           echo "CocoaPods dependencies installed successfully"
@@ -304,8 +321,13 @@ jobs:
         run: |
           bundle exec fastlane ios setup_provisioning_profiles
 
+      - name: Reset ccache stats
+        run: ccache -z || true
+
       - name: Build App
         id: build_app
+        env:
+          CCACHE_BINARY: /opt/homebrew/bin/ccache
         run: |
           echo -e "\033[1;34m==================== BUILD APP DEBUG ====================\033[0m"
           echo -e "\033[1;36mPre-Build Environment Check:\033[0m"
@@ -377,6 +399,10 @@ jobs:
             echo "  File info: $(ls -lh "${IPA_OUTPUT_PATH}")"
           fi
           echo -e "\033[1;34m========================================================\033[0m"
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s || true
 
       - name: Debug Build Failure
         if: failure()
