@@ -4,7 +4,6 @@ on: [pull_request]
 
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: e2e-ios-${{ github.ref }}
@@ -168,14 +167,29 @@ jobs:
       HD_MNEMONIC_BIP84: ${{ secrets.HD_MNEMONIC_BIP84 }}
 
     steps:
-      - name: Collect workflow telemetry
-        uses: catchpoint/workflow-telemetry-action@94c3c3d9567a0205de6da68a76c428ce4e769af1 # v2.0.0
-        with:
-          metric_frequency: 5
-          comment_on_pr: true
-
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start system monitor
+        run: |
+          mkdir -p /tmp/sysmon
+          {
+            while true; do
+              echo "===== $(date -u +%FT%TZ) ====="
+              echo "-- vm_stat --"
+              vm_stat
+              echo "-- top (cpu sorted, top 8) --"
+              top -l 1 -n 8 -o cpu -stats pid,command,cpu,mem
+              echo "-- booted simulators --"
+              xcrun simctl list devices booted 2>/dev/null | grep -i booted || echo "(none)"
+              echo "-- df / --"
+              df -h / | tail -1
+              echo
+              sleep 30
+            done
+          } > /tmp/sysmon/sysmon.log 2>&1 &
+          echo $! > /tmp/sysmon/pid
+          echo "monitor pid=$(cat /tmp/sysmon/pid)"
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -204,6 +218,19 @@ jobs:
       - name: Disable simulator animations
         run: defaults write com.apple.iphonesimulator SlowMotionAnimation -bool NO
 
+      # Pre-boot simulator so first detox launchApp lands warm.
+      - name: Pre-boot iOS simulator
+        run: |
+          DEVICE_TYPE=$(jq -r '.devices.simulator.device.type' .detoxrc.json)
+          UDID=$(applesimutils --list --byType "$DEVICE_TYPE" | jq -r '.[0].udid // empty')
+          if [ -z "$UDID" ]; then
+            echo "ERROR: no simulator of type '$DEVICE_TYPE' found"
+            exit 1
+          fi
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl launch "$UDID" com.apple.springboard >/dev/null 2>&1 || true
+
       - name: Run detox tests
         timeout-minutes: 360
         # --maxWorkers 3 forwards to jest. Detox actually runs 2 simulators
@@ -218,6 +245,20 @@ jobs:
             --retries 3 \
             --reuse \
             --artifacts-location ./artifacts
+
+      - name: Stop system monitor
+        if: always()
+        run: |
+          kill "$(cat /tmp/sysmon/pid)" 2>/dev/null || true
+          echo "monitor stopped"
+          wc -l /tmp/sysmon/sysmon.log || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: e2e-ios-sysmon
+          path: /tmp/sysmon/sysmon.log
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
