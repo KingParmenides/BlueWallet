@@ -19,9 +19,6 @@ jobs:
       github.event.action == 'synchronize'
     runs-on: macos-15
     timeout-minutes: 120
-    env:
-      CCACHE_MAXSIZE: "2G"
-      CCACHE_DIR: /Users/runner/.ccache
 
     steps:
       - name: Check PR labels
@@ -88,22 +85,9 @@ jobs:
             ios/Pods
             ~/Library/Caches/CocoaPods
             ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-catalyst-ccache-${{ hashFiles('ios/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-catalyst-${{ hashFiles('ios/Podfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pods-catalyst-ccache-
-
-      - name: Install ccache
-        if: github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true'
-        run: brew install ccache
-
-      - name: Cache ccache
-        if: github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: /Users/runner/.ccache
-          key: ${{ runner.os }}-ccache-catalyst-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-catalyst-
+            ${{ runner.os }}-pods-catalyst-
 
       - name: Install CocoaPods dependencies
         if: github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true'
@@ -111,7 +95,6 @@ jobs:
           SKIP_APP_STORE_CONNECT_AUTH: '1'
           RCT_USE_RN_DEP: "1"
           RCT_USE_PREBUILT_RNCORE: "1"
-          USE_CCACHE: "1"
         run: bundle exec fastlane ios install_pods
 
       - name: Create temporary keychain for signing
@@ -122,10 +105,6 @@ jobs:
           security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
 
-      - name: Reset ccache stats
-        if: github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true'
-        run: ccache -z || true
-
       - name: Build Mac Catalyst app with Fastlane
         if: github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true'
         id: build_catalyst
@@ -133,7 +112,6 @@ jobs:
         env:
           SKIP_APP_STORE_CONNECT_AUTH: '1'
           SKIP_CLEAR_DERIVED_DATA: '1'
-          CCACHE_BINARY: /opt/homebrew/bin/ccache
           CATALYST_SIGNING_IDENTITY: ${{ steps.labels.outputs.upload_testflight == 'true' && secrets.CATALYST_SIGNING_IDENTITY || '' }}
           CATALYST_TEAM_ID: ${{ steps.labels.outputs.upload_testflight == 'true' && secrets.CATALYST_TEAM_ID || '' }}
           GIT_URL: ${{ steps.labels.outputs.upload_testflight == 'true' && secrets.GIT_URL || '' }}
@@ -141,10 +119,6 @@ jobs:
           MATCH_READONLY: ${{ steps.labels.outputs.upload_testflight == 'true' && 'false' || 'true' }}
           KEYCHAIN_NAME: ${{ steps.labels.outputs.upload_testflight == 'true' && 'build' || '' }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-
-      - name: ccache stats
-        if: always() && (github.event_name == 'workflow_dispatch' || steps.labels.outputs.has_mac_dmg == 'true')
-        run: ccache -s || true
 
       - name: Upload Mac Catalyst DMG
         id: upload_dmg
