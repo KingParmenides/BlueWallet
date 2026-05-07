@@ -205,7 +205,6 @@ jobs:
             --record-logs failing \
             --take-screenshots failing \
             --headless \
-            --workers 2 \
             --retries 3 \
             --reuse \
             --artifacts-location ./artifacts
