@@ -199,15 +199,15 @@ jobs:
 
       - name: Run detox tests
         timeout-minutes: 360
-        # --maxWorkers 3 forwards to jest. Detox actually runs 2 simulators
-        # in parallel for this suite given current spec layout.
+        # --maxWorkers 2 forwards to jest. macos-26 has 7 GB RAM; >2 sims
+        # exhaust memory and the run hangs.
         run: |
           npm run e2e:test:ios-release -- \
             --record-videos failing \
             --record-logs failing \
             --take-screenshots failing \
             --headless \
-            --maxWorkers 3 \
+            --maxWorkers 2 \
             --retries 3 \
             --reuse \
             --artifacts-location ./artifacts
