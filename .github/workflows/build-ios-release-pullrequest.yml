@@ -210,7 +210,7 @@ jobs:
       - name: Set Up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.4.8
+          ruby-version: 3.4.9
 
       - name: System Debug Information
         run: |
@@ -492,7 +492,7 @@ jobs:
       - name: Set Up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.4.8
+          ruby-version: 3.4.9
           
       - name: Install Dependencies with Bundler
         run: |
